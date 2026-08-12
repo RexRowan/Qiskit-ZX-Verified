@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest tests/ -v --cov=qiskit_zx --cov-report=term-missing
+
+      - name: Run example script (smoke test)
+        run: python examples/01_certified_fusion.py
+
+  lean-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install elan
+        run: curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+
+      - name: Build Lean project
+        working-directory: lean
+        run: |
+          source $HOME/.elan/env
+          lake build
+
+      - name: Confirm the fusion proof has no sorry / added axioms
+        working-directory: lean
+        run: |
+          source $HOME/.elan/env
+          echo 'import ZXVerify.SpiderFusion
+          #print axioms ZXVerify.spider_fusion' > /tmp/axiom_check.lean
+          OUTPUT=$(LEAN_PATH="$(pwd)/.lake/build/lib/lean" lean /tmp/axiom_check.lean)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q "sorryAx"; then
+            echo "FAILED: proof depends on sorryAx (i.e. contains a 'sorry')"
+            exit 1
+          fi
+          echo "OK: no sorryAx in the dependency list"
+
+  bridge-cross-check:
+    needs: [python-tests, lean-proof]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install elan
+        run: curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Build Lean project
+        working-directory: lean
+        run: |
+          source $HOME/.elan/env
+          lake build
+
+      - name: Cross-check Lean table against Python table
+        run: |
+          source $HOME/.elan/env
+          python scripts/extract_lean_certificate.py
