@@ -1,4 +1,4 @@
-# qiskit-zx-verified
+# Qiskit ZX Verified
 
 A Clifford phase-gate fusion pass for [Qiskit](https://www.ibm.com/quantum/qiskit),
 where the core rewrite rule is **formally verified in Lean 4** -- not
