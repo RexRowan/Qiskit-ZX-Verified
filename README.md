@@ -1,5 +1,7 @@
 # Qiskit ZX Verified
 
+[![Qiskit Ecosystem](https://qisk.it/e-91f8bc77)](https://qisk.it/e)
+
 A Clifford phase-gate fusion pass for [Qiskit](https://www.ibm.com/quantum/qiskit),
 where the core rewrite rule is **formally verified in Lean 4** -- not
 tested, not benchmarked against known cases, but machine-checked with a
